@@ -9,6 +9,22 @@ Proyecto para overlays de stream de la comunidad Voranix con:
 - dashboard Angular para editar branding, sponsors y comandos
 - base de datos SQLite para pocos streamers
 
+## GitHub
+
+Repositorio remoto:
+
+```text
+https://github.com/voranix/api_stream
+```
+
+Para que se vea mejor en GitHub, te recomiendo completar en `About`:
+
+- Description: `Overlay y dashboard para streamers de la comunidad Voranix`
+- Website: la URL del dashboard en Render
+- Topics: `twitch`, `overlay`, `streaming`, `angular`, `nodejs`, `socket-io`, `render`
+
+Tambien puedes subir una imagen de social preview desde los ajustes del repo para que los enlaces se vean mejor al compartirlos.
+
 ## Estructura
 
 - `backend/`: API Express + Socket.IO + bot de Twitch
@@ -100,12 +116,32 @@ Tambien puedes desplegar ambos servicios automaticamente con `render.yaml` en la
 Flujo recomendado en Render:
 
 1. Crea los servicios desde `render.yaml`.
+2. Conecta tu cuenta de GitHub a Render y elige este repositorio.
 2. En Twitch Developers registra el redirect exacto del backend:
    `https://voranix-overlay-api.onrender.com/api/auth/twitch/callback`
 3. Completa en Render los secretos marcados con `sync: false`.
 4. Abre el dashboard, configura la `API base` y guárdala.
 5. Usa en OBS la URL:
    `https://voranix-overlay-api.onrender.com/overlay/?channel=voranix`
+
+Pasos concretos en Render:
+
+1. En Render entra a `New > Blueprint`.
+2. Selecciona el repo `voranix/api_stream`.
+3. Elige la rama `main`.
+4. Confirma la lectura de `render.yaml`.
+5. Crea los dos servicios.
+6. En el servicio `voranix-overlay-api`, agrega las variables secretas que faltan.
+7. En Twitch Developers, revisa que el redirect configurado sea exactamente el mismo que usa Render.
+
+Fuentes oficiales:
+
+- GitHub repos best practices: https://docs.github.com/repositories/creating-and-managing-repositories/best-practices-for-repositories
+- GitHub social preview: https://docs.github.com/en/github/administering-a-repository/customizing-your-repositorys-social-media-preview
+- Render Connect GitHub: https://render.com/docs/github
+- Render Blueprints: https://render.com/docs/infrastructure-as-code
+- Render Blueprint spec: https://render.com/docs/blueprint-spec
+- Render Static Sites: https://render.com/docs/static-sites
 
 Si luego quieres subir el dashboard por separado:
 

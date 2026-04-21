@@ -35,11 +35,12 @@ services:
       mountPath: /var/data
       sizeGB: 1
 
-  - type: static
+  - type: web
     name: voranix-overlay-dashboard
+    runtime: static
     rootDir: dashboard-angular
     buildCommand: npm install && npm run build
-    staticPublishPath: dist/dashboard-angular/browser
+    staticPublishPath: dashboard-angular/dist/dashboard-angular/browser
     pullRequestPreviewsEnabled: false
     routes:
       - type: rewrite
