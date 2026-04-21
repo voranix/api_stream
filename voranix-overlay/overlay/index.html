@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voranix Overlay</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="overlay-shell">
+    <header class="brand-chip">
+      <div class="brand-chip__logo" id="logo-mark">V</div>
+      <div class="brand-chip__meta">
+        <span class="brand-chip__eyebrow" id="community-name">Comunidad Voranix</span>
+        <strong class="brand-chip__name" id="logo-text">VORANIX</strong>
+      </div>
+    </header>
+
+    <aside class="sponsor-card">
+      <span class="sponsor-card__label">Sponsor visible</span>
+      <strong class="sponsor-card__name" id="sponsor-name">Patrocinador Principal</strong>
+      <p class="sponsor-card__message" id="persistent-message">
+        Patrocinadores, eventos y anuncios oficiales de la comunidad.
+      </p>
+    </aside>
+
+    <section class="event-stage" id="event-stage">
+      <span class="event-stage__badge" id="event-type">Promo</span>
+      <h1 class="event-stage__title" id="event-title"></h1>
+      <p class="event-stage__message" id="event-message"></p>
+    </section>
+
+    <footer class="ticker">
+      <div class="ticker__track" id="ticker-text">Sigue las novedades de Voranix en directo.</div>
+    </footer>
+  </div>
+
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <script src="overlay.js"></script>
+</body>
+</html>

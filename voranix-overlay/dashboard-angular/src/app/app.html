@@ -1,0 +1,212 @@
+<main class="shell">
+  <section class="hero">
+    <div>
+      <p class="eyebrow">Dashboard Angular</p>
+      <h1>Overlay de stream para la comunidad Voranix</h1>
+      <p class="lead">
+        Configura logo persistente, sponsors visibles, comandos de chat y alertas que se disparan
+        en tiempo real para los streamers de la comunidad.
+      </p>
+    </div>
+
+    <div class="hero__card">
+      <div class="session-box">
+        @if (session().authenticated) {
+          <p class="status">
+            Sesion activa como <strong>{{ session().user?.displayName }}</strong>
+            ({{ session().user?.role }})
+          </p>
+          <button type="button" class="btn btn--ghost" (click)="logout()">Cerrar sesion</button>
+        } @else {
+          <p class="status">Acceso con Twitch requerido para editar overlays.</p>
+          <a class="btn" [href]="loginUrl()">Entrar con Twitch</a>
+        }
+      </div>
+
+      <label>
+        API base
+        <input [(ngModel)]="apiBase" />
+      </label>
+      <button type="button" class="btn btn--ghost" (click)="saveApiBase()">
+        Guardar URL API
+      </button>
+
+      <label>
+        Channel ID
+        <input [(ngModel)]="channel.channelId" />
+      </label>
+
+      <div class="hero__actions">
+        <button type="button" class="btn btn--ghost" (click)="loadChannel()" [disabled]="loading()">
+          {{ loading() ? 'Cargando...' : 'Cargar canal' }}
+        </button>
+        <button type="button" class="btn" (click)="saveChannel()" [disabled]="saving()">
+          {{ saving() ? 'Guardando...' : 'Guardar cambios' }}
+        </button>
+      </div>
+
+      <p class="status">{{ message() }}</p>
+      <a class="overlay-link" [href]="overlayUrl()" target="_blank" rel="noopener">
+        Abrir overlay del canal
+      </a>
+
+      @if (session().authenticated && session().channels?.length) {
+        <div class="channel-switcher">
+          <p class="eyebrow">Canales accesibles</p>
+          @for (item of session().channels || []; track item.channelId) {
+            <button type="button" class="btn btn--ghost" (click)="setActiveChannel(item.channelId)">
+              {{ item.channelId }}
+            </button>
+          }
+        </div>
+      }
+    </div>
+  </section>
+
+  <section class="grid">
+    <article class="panel">
+      <h2>Canal y branding</h2>
+
+      <div class="form-grid">
+        <label>
+          Canal Twitch
+          <input [(ngModel)]="channel.twitchChannel" />
+        </label>
+
+        <label>
+          Nombre comunidad
+          <input [(ngModel)]="channel.branding.communityName" />
+        </label>
+
+        <label>
+          Texto logo
+          <input [(ngModel)]="channel.branding.logoText" />
+        </label>
+
+        <label>
+          Color principal
+          <input [(ngModel)]="channel.branding.accent" />
+        </label>
+
+        <label>
+          Color secundario
+          <input [(ngModel)]="channel.branding.secondaryAccent" />
+        </label>
+
+        <label>
+          Logo URL
+          <input [(ngModel)]="channel.branding.logoUrl" />
+        </label>
+      </div>
+
+      <label>
+        Mensaje persistente
+        <textarea rows="3" [(ngModel)]="channel.branding.persistentMessage"></textarea>
+      </label>
+
+      <label>
+        Texto ticker
+        <textarea rows="3" [(ngModel)]="channel.branding.tickerText"></textarea>
+      </label>
+    </article>
+
+    <article class="panel">
+      <div class="panel__header">
+        <h2>Sponsors visibles</h2>
+        @if (isAdmin()) {
+          <button type="button" class="btn btn--ghost" (click)="addSponsor()">Agregar sponsor</button>
+        } @else {
+          <span class="status">Solo admin puede modificar patrocinadores.</span>
+        }
+      </div>
+
+      @for (sponsor of channel.sponsors; track sponsor; let i = $index) {
+        <div class="item-card">
+          <div class="item-card__header">
+            <strong>Sponsor {{ i + 1 }}</strong>
+            @if (isAdmin()) {
+              <button type="button" class="link-button" (click)="removeSponsor(i)">Eliminar</button>
+            }
+          </div>
+
+          <label>
+            Nombre
+            <input [(ngModel)]="sponsor.name" [disabled]="!isAdmin()" />
+          </label>
+
+          <label>
+            Mensaje
+            <textarea rows="2" [(ngModel)]="sponsor.message" [disabled]="!isAdmin()"></textarea>
+          </label>
+
+          <label>
+            Logo URL
+            <input [(ngModel)]="sponsor.logoUrl" [disabled]="!isAdmin()" />
+          </label>
+        </div>
+      }
+    </article>
+  </section>
+
+  <section class="panel">
+    <div class="panel__header">
+      <h2>Comandos de chat</h2>
+      <button type="button" class="btn btn--ghost" (click)="addCommand()">Agregar comando</button>
+    </div>
+
+    @for (command of channel.commands; track command; let i = $index) {
+      <div class="item-card">
+        <div class="item-card__header">
+          <strong>Comando {{ i + 1 }}</strong>
+          <button type="button" class="link-button" (click)="removeCommand(i)">Eliminar</button>
+        </div>
+
+        <div class="form-grid">
+          <label>
+            Trigger
+            <input [(ngModel)]="command.trigger" />
+          </label>
+
+          <label>
+            Tipo
+            <select [(ngModel)]="command.type">
+              <option value="promo">Promo</option>
+              <option value="event">Evento</option>
+              <option value="sponsor">Sponsor</option>
+              <option value="alert">Alerta</option>
+            </select>
+          </label>
+
+          <label>
+            Titulo
+            <input [(ngModel)]="command.title" />
+          </label>
+
+          <label>
+            Duracion ms
+            <input type="number" [(ngModel)]="command.durationMs" />
+          </label>
+        </div>
+
+        <label>
+          Mensaje
+          <textarea rows="3" [(ngModel)]="command.message"></textarea>
+        </label>
+      </div>
+    }
+  </section>
+
+  <section class="panel panel--actions">
+    <div>
+      <p class="eyebrow">Pruebas rápidas</p>
+      <h2>Dispara eventos sin Twitch</h2>
+    </div>
+
+    <div class="action-row">
+      <button type="button" class="btn" (click)="trigger('promo')">Probar promo</button>
+      <button type="button" class="btn btn--ghost" (click)="trigger('event')">Probar evento</button>
+      <button type="button" class="btn btn--ghost" (click)="trigger('sponsor')">Probar sponsor</button>
+      <button type="button" class="btn btn--ghost" (click)="trigger('alert')">Probar alerta</button>
+    </div>
+  </section>
+</main>

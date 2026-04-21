@@ -1,0 +1,47 @@
+{
+  "channels": {
+    "voranix": {
+      "channelId": "voranix",
+      "twitchChannel": "voranix",
+      "branding": {
+        "communityName": "Comunidad Voranix",
+        "logoText": "VORANIX",
+        "accent": "#f97316",
+        "secondaryAccent": "#22c55e",
+        "logoUrl": "",
+        "persistentMessage": "Patrocinadores, eventos y anuncios oficiales de la comunidad.",
+        "tickerText": "Sigue las novedades de Voranix en directo."
+      },
+      "sponsors": [
+        {
+          "name": "Patrocinador Principal",
+          "message": "Apoya a quienes impulsan la comunidad Voranix.",
+          "logoUrl": ""
+        }
+      ],
+      "commands": [
+        {
+          "trigger": "!promo",
+          "type": "promo",
+          "title": "Promo Voranix",
+          "message": "Visita a nuestros patrocinadores oficiales y apoya la comunidad.",
+          "durationMs": 7000
+        },
+        {
+          "trigger": "!evento",
+          "type": "event",
+          "title": "Evento Voranix",
+          "message": "Evento Voranix activo. Revisa Discord para participar.",
+          "durationMs": 8000
+        },
+        {
+          "trigger": "!sponsor",
+          "type": "sponsor",
+          "title": "Sponsor Destacado",
+          "message": "Sponsor de la semana en pantalla.",
+          "durationMs": 7000
+        }
+      ]
+    }
+  }
+}

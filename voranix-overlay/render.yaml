@@ -1,0 +1,47 @@
+services:
+  - type: web
+    name: voranix-overlay-api
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    plan: free
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DATABASE_PATH
+        value: /var/data/voranix.sqlite
+      - key: DASHBOARD_URL
+        value: https://voranix-overlay-dashboard.onrender.com
+      - key: TWITCH_BOT_USERNAME
+        sync: false
+      - key: TWITCH_OAUTH
+        sync: false
+      - key: TWITCH_CHANNEL
+        sync: false
+      - key: TWITCH_CLIENT_ID
+        sync: false
+      - key: TWITCH_CLIENT_SECRET
+        sync: false
+      - key: TWITCH_REDIRECT_URI
+        value: https://voranix-overlay-api.onrender.com/api/auth/twitch/callback
+      - key: ADMIN_TWITCH_LOGINS
+        sync: false
+    disk:
+      name: voranix-overlay-data
+      mountPath: /var/data
+      sizeGB: 1
+
+  - type: static
+    name: voranix-overlay-dashboard
+    rootDir: dashboard-angular
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist/dashboard-angular/browser
+    pullRequestPreviewsEnabled: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
