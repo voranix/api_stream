@@ -3,9 +3,9 @@ const {
   getUserBySessionToken
 } = require("../services/authService");
 
-function attachUser(request, response, next) {
+async function attachUser(request, response, next) {
   const token = getSessionTokenFromRequest(request);
-  request.user = getUserBySessionToken(token);
+  request.user = await getUserBySessionToken(token);
   request.sessionToken = token;
   next();
 }

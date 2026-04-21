@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const { db } = require("./db");
+const { query } = require("./db");
 const { ensureOwnedChannelForUser } = require("./channelStore");
 
 const SESSION_COOKIE = "voranix_session";
@@ -105,81 +105,84 @@ function resolveRole(login) {
   return adminLogins.includes(String(login || "").toLowerCase()) ? "admin" : "streamer";
 }
 
-function upsertUserFromTwitch(profile) {
+async function upsertUserFromTwitch(profile) {
   const role = resolveRole(profile.login);
-  const existing = db.prepare("SELECT * FROM users WHERE twitch_id = ?").get(profile.id);
+  const existingResult = await query("SELECT * FROM users WHERE twitch_id = $1", [profile.id]);
+  const existing = existingResult.rows[0];
 
   if (existing) {
-    db.prepare(
+    await query(
       `UPDATE users
-       SET login = ?,
-           display_name = ?,
-           email = ?,
-           profile_image_url = ?,
-           role = ?,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`
-    ).run(
-      profile.login,
-      profile.display_name,
-      profile.email || "",
-      profile.profile_image_url || "",
-      role,
-      existing.id
+       SET login = $1,
+           display_name = $2,
+           email = $3,
+           profile_image_url = $4,
+           role = $5,
+           updated_at = NOW()
+       WHERE id = $6`,
+      [
+        profile.login,
+        profile.display_name,
+        profile.email || "",
+        profile.profile_image_url || "",
+        role,
+        existing.id
+      ]
     );
   } else {
-    db.prepare(
+    await query(
       `INSERT INTO users (twitch_id, login, display_name, email, profile_image_url, role)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    ).run(
-      profile.id,
-      profile.login,
-      profile.display_name,
-      profile.email || "",
-      profile.profile_image_url || "",
-      role
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      [
+        profile.id,
+        profile.login,
+        profile.display_name,
+        profile.email || "",
+        profile.profile_image_url || "",
+        role
+      ]
     );
   }
 
-  const user = db.prepare("SELECT * FROM users WHERE twitch_id = ?").get(profile.id);
+  const userResult = await query("SELECT * FROM users WHERE twitch_id = $1", [profile.id]);
+  const user = userResult.rows[0];
 
   if (user.role !== "admin") {
-    ensureOwnedChannelForUser(user);
+    await ensureOwnedChannelForUser(user);
   }
 
   return user;
 }
 
-function createSession(userId) {
+async function createSession(userId) {
   const token = crypto.randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
 
-  db.prepare("INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, ?)").run(
+  await query("INSERT INTO sessions (token, user_id, expires_at) VALUES ($1,$2,$3)", [
     token,
     userId,
     expiresAt
-  );
+  ]);
 
   return token;
 }
 
-function deleteSession(token) {
-  db.prepare("DELETE FROM sessions WHERE token = ?").run(token);
+async function deleteSession(token) {
+  await query("DELETE FROM sessions WHERE token = $1", [token]);
 }
 
-function getUserBySessionToken(token) {
+async function getUserBySessionToken(token) {
   if (!token) return null;
 
-  const row = db
-    .prepare(
-      `SELECT users.*
-       FROM sessions
-       INNER JOIN users ON users.id = sessions.user_id
-       WHERE sessions.token = ? AND sessions.expires_at > CURRENT_TIMESTAMP`
-    )
-    .get(token);
+  const result = await query(
+    `SELECT users.*
+     FROM sessions
+     INNER JOIN users ON users.id = sessions.user_id
+     WHERE sessions.token = $1 AND sessions.expires_at > NOW()`,
+    [token]
+  );
 
-  return row || null;
+  return result.rows[0] || null;
 }
 
 module.exports = {

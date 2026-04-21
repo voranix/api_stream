@@ -12,15 +12,15 @@ const { requireAuth } = require("../middleware/auth");
 
 const router = express.Router();
 
-router.get("/", (req, res) => {
+router.get("/", async (req, res) => {
   if (!req.user) {
     return res.status(401).json({ error: "authentication_required" });
   }
 
-  return res.json({ channels: getAccessibleChannels(req.user) });
+  return res.json({ channels: await getAccessibleChannels(req.user) });
 });
 
-router.get("/:channelId", (req, res) => {
+router.get("/:channelId", async (req, res) => {
   if (!req.user) {
     return res.status(401).json({ error: "authentication_required" });
   }
@@ -29,7 +29,7 @@ router.get("/:channelId", (req, res) => {
     return res.status(403).json({ error: "forbidden" });
   }
 
-  const channel = getChannel(req.params.channelId);
+  const channel = await getChannel(req.params.channelId);
   if (!channel) {
     return res.status(404).json({ error: "channel_not_found" });
   }
@@ -37,28 +37,28 @@ router.get("/:channelId", (req, res) => {
   return res.json(channel);
 });
 
-router.put("/:channelId", requireAuth, (req, res) => {
+router.put("/:channelId", requireAuth, async (req, res) => {
   if (!canManageChannel(req.user, req.params.channelId)) {
     return res.status(403).json({ error: "forbidden" });
   }
 
-  const channel = saveChannel(req.params.channelId, req.body || {}, {
+  const channel = await saveChannel(req.params.channelId, req.body || {}, {
     allowSponsorEdit: req.user.role === "admin",
     ownerUserId: req.user.role === "admin" ? undefined : req.user.id
   });
   sendOverlayEvent(
     channel.channelId,
     "configUpdated",
-    getPublicChannelConfig(channel.channelId)
+    await getPublicChannelConfig(channel.channelId)
   );
   res.json(channel);
 });
 
-router.get("/:channelId/public", (req, res) => {
-  res.json(getPublicChannelConfig(req.params.channelId));
+router.get("/:channelId/public", async (req, res) => {
+  res.json(await getPublicChannelConfig(req.params.channelId));
 });
 
-router.post("/:channelId/trigger", requireAuth, (req, res) => {
+router.post("/:channelId/trigger", requireAuth, async (req, res) => {
   if (!canManageChannel(req.user, req.params.channelId)) {
     return res.status(403).json({ error: "forbidden" });
   }

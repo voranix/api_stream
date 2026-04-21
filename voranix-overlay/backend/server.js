@@ -13,8 +13,9 @@ const {
   normalizeChannelId
 } = require("./services/channelStore");
 const { attachUser } = require("./middleware/auth");
+const { initializeDatabase } = require("./services/db");
 
-require("./twitchBot");
+const startTwitchBot = require("./twitchBot");
 
 const app = express();
 app.use(
@@ -45,8 +46,8 @@ app.get("/", (req, res) => {
   });
 });
 
-app.get("/api/public/:channelId", (req, res) => {
-  res.json(getPublicChannelConfig(req.params.channelId));
+app.get("/api/public/:channelId", async (req, res) => {
+  res.json(await getPublicChannelConfig(req.params.channelId));
 });
 
 app.get("/api/test/:channelId", (req, res) => {
@@ -63,6 +64,14 @@ app.get("/api/test/:channelId", (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
-server.listen(PORT, () => {
-  console.log(`Voranix Overlay API running on port ${PORT}`);
-});
+initializeDatabase()
+  .then(() => {
+    startTwitchBot();
+    server.listen(PORT, () => {
+      console.log(`Voranix Overlay API running on port ${PORT}`);
+    });
+  })
+  .catch((error) => {
+    console.error("No se pudo iniciar la base de datos:", error);
+    process.exit(1);
+  });

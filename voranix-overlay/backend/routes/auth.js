@@ -22,7 +22,7 @@ function requiredAuthEnv() {
   );
 }
 
-router.get("/me", (request, response) => {
+router.get("/me", async (request, response) => {
   if (!request.user) {
     return response.json({ authenticated: false });
   }
@@ -37,7 +37,7 @@ router.get("/me", (request, response) => {
       profileImageUrl: request.user.profile_image_url,
       role: request.user.role
     },
-    channels: getAccessibleChannels(request.user)
+    channels: await getAccessibleChannels(request.user)
   });
 });
 
@@ -110,8 +110,8 @@ router.get("/twitch/callback", async (request, response) => {
       throw new Error("Twitch no devolvio perfil de usuario");
     }
 
-    const user = upsertUserFromTwitch(twitchProfile);
-    const sessionToken = createSession(user.id);
+    const user = await upsertUserFromTwitch(twitchProfile);
+    const sessionToken = await createSession(user.id);
 
     clearStateCookie(response, request);
     setSessionCookie(response, sessionToken, request);
@@ -124,9 +124,9 @@ router.get("/twitch/callback", async (request, response) => {
   }
 });
 
-router.post("/logout", (request, response) => {
+router.post("/logout", async (request, response) => {
   if (request.sessionToken) {
-    deleteSession(request.sessionToken);
+    await deleteSession(request.sessionToken);
   }
 
   clearStateCookie(response, request);

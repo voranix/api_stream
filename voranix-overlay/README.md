@@ -7,7 +7,7 @@ Proyecto para overlays de stream de la comunidad Voranix con:
 - comandos de chat via Twitch
 - overlay web con logo y sponsor siempre visibles
 - dashboard Angular para editar branding, sponsors y comandos
-- base de datos SQLite para pocos streamers
+- base de datos Postgres compatible con Render free
 
 ## GitHub
 
@@ -51,10 +51,8 @@ TWITCH_CLIENT_SECRET=tu_client_secret
 TWITCH_REDIRECT_URI=http://localhost:3000/api/auth/twitch/callback
 ADMIN_TWITCH_LOGINS=tu_login_admin,otro_admin
 DASHBOARD_URL=http://localhost:4200
-DATABASE_PATH=C:\\ruta\\fuera-de-onedrive\\voranix.sqlite
+DATABASE_URL=postgresql://usuario:password@host:5432/database
 ```
-
-`DATABASE_PATH` es importante en Windows si el proyecto vive dentro de OneDrive. Si no lo defines, la app intentara usar `%LOCALAPPDATA%\\VoranixOverlay\\voranix.sqlite`.
 
 Tambien tienes un ejemplo listo en `backend/.env.example`.
 
@@ -102,26 +100,25 @@ Despliega primero `backend/` como Web Service en Render.
 - Start Command: `npm start`
 - Root Directory: `backend`
 
-Para SQLite en Render, apunta `DATABASE_PATH` a un disco persistente, por ejemplo:
+Tambien puedes desplegar todo automaticamente con `render.yaml`:
 
-```env
-DATABASE_PATH=/var/data/voranix.sqlite
-```
-
-Tambien puedes desplegar ambos servicios automaticamente con `render.yaml` en la raiz del proyecto:
-
-- `voranix-overlay-api`: API + overlay + bot + SQLite persistente
+- `voranix-overlay-api`: API + overlay + bot de Twitch
 - `voranix-overlay-dashboard`: dashboard Angular estatico
+- `voranix-overlay-db`: base Postgres free administrada por Render
+
+Limitacion importante:
+
+- Render Postgres free puede expirar segun la politica vigente de Render, asi que revisa ese detalle antes de usarlo como base definitiva.
 
 Flujo recomendado en Render:
 
 1. Crea los servicios desde `render.yaml`.
 2. Conecta tu cuenta de GitHub a Render y elige este repositorio.
-2. En Twitch Developers registra el redirect exacto del backend:
+3. En Twitch Developers registra el redirect exacto del backend:
    `https://voranix-overlay-api.onrender.com/api/auth/twitch/callback`
-3. Completa en Render los secretos marcados con `sync: false`.
-4. Abre el dashboard, configura la `API base` y guárdala.
-5. Usa en OBS la URL:
+4. Completa en Render los secretos marcados con `sync: false`.
+5. Abre el dashboard, configura la `API base` y guardala.
+6. Usa en OBS la URL:
    `https://voranix-overlay-api.onrender.com/overlay/?channel=voranix`
 
 Pasos concretos en Render:
@@ -129,8 +126,8 @@ Pasos concretos en Render:
 1. En Render entra a `New > Blueprint`.
 2. Selecciona el repo `voranix/api_stream`.
 3. Elige la rama `main`.
-4. Confirma la lectura de `render.yaml`.
-5. Crea los dos servicios.
+4. Usa como Blueprint Path: `voranix-overlay/render.yaml`.
+5. Crea los tres recursos.
 6. En el servicio `voranix-overlay-api`, agrega las variables secretas que faltan.
 7. En Twitch Developers, revisa que el redirect configurado sea exactamente el mismo que usa Render.
 

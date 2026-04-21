@@ -1,4 +1,4 @@
-const { db } = require("./db");
+const { query, withTransaction } = require("./db");
 
 const DEFAULT_BRANDING = {
   communityName: "Comunidad Voranix",
@@ -54,26 +54,32 @@ function sanitizeBranding(branding, fallback = DEFAULT_BRANDING, channelId = "vo
   };
 }
 
-function mapChannelRow(row) {
+async function getSponsorsByChannelDbId(channelDbId) {
+  const result = await query(
+    `SELECT name, message, logo_url AS "logoUrl"
+     FROM sponsors
+     WHERE channel_id = $1
+     ORDER BY sort_order ASC, id ASC`,
+    [channelDbId]
+  );
+
+  return result.rows;
+}
+
+async function getCommandsByChannelDbId(channelDbId) {
+  const result = await query(
+    `SELECT trigger, type, title, message, duration_ms AS "durationMs"
+     FROM commands
+     WHERE channel_id = $1
+     ORDER BY sort_order ASC, id ASC`,
+    [channelDbId]
+  );
+
+  return result.rows;
+}
+
+async function mapChannelRow(row) {
   if (!row) return null;
-
-  const sponsors = db
-    .prepare(
-      `SELECT name, message, logo_url AS logoUrl
-       FROM sponsors
-       WHERE channel_id = ?
-       ORDER BY sort_order ASC, id ASC`
-    )
-    .all(row.id);
-
-  const commands = db
-    .prepare(
-      `SELECT trigger, type, title, message, duration_ms AS durationMs
-       FROM commands
-       WHERE channel_id = ?
-       ORDER BY sort_order ASC, id ASC`
-    )
-    .all(row.id);
 
   return {
     channelId: row.channel_id,
@@ -88,29 +94,31 @@ function mapChannelRow(row) {
       persistentMessage: row.persistent_message || "",
       tickerText: row.ticker_text || ""
     },
-    sponsors,
-    commands
+    sponsors: await getSponsorsByChannelDbId(row.id),
+    commands: await getCommandsByChannelDbId(row.id)
   };
 }
 
-function getChannelRowByChannelId(channelId) {
-  return db
-    .prepare("SELECT * FROM channels WHERE channel_id = ?")
-    .get(normalizeChannelId(channelId));
+async function getChannelRowByChannelId(channelId) {
+  const result = await query("SELECT * FROM channels WHERE channel_id = $1", [
+    normalizeChannelId(channelId)
+  ]);
+  return result.rows[0] || null;
 }
 
-function getChannelRowByTwitchChannel(twitchChannel) {
-  return db
-    .prepare("SELECT * FROM channels WHERE twitch_channel = ?")
-    .get(normalizeChannelId(twitchChannel));
+async function getChannelRowByTwitchChannel(twitchChannel) {
+  const result = await query("SELECT * FROM channels WHERE twitch_channel = $1", [
+    normalizeChannelId(twitchChannel)
+  ]);
+  return result.rows[0] || null;
 }
 
-function insertDefaultChannel(channelId, ownerUserId = null) {
+async function insertDefaultChannel(channelId, ownerUserId = null) {
   const safeChannelId = normalizeChannelId(channelId);
   const branding = sanitizeBranding({}, DEFAULT_BRANDING, safeChannelId);
 
-  const result = db
-    .prepare(
+  return withTransaction(async (client) => {
+    const insertedChannel = await client.query(
       `INSERT INTO channels (
         channel_id,
         twitch_channel,
@@ -122,97 +130,101 @@ function insertDefaultChannel(channelId, ownerUserId = null) {
         logo_url,
         persistent_message,
         ticker_text
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    )
-    .run(
-      safeChannelId,
-      safeChannelId,
-      ownerUserId,
-      branding.communityName,
-      branding.logoText,
-      branding.accent,
-      branding.secondaryAccent,
-      branding.logoUrl,
-      branding.persistentMessage,
-      branding.tickerText
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      RETURNING id`,
+      [
+        safeChannelId,
+        safeChannelId,
+        ownerUserId,
+        branding.communityName,
+        branding.logoText,
+        branding.accent,
+        branding.secondaryAccent,
+        branding.logoUrl,
+        branding.persistentMessage,
+        branding.tickerText
+      ]
     );
 
-  db.prepare(
-    `INSERT INTO sponsors (channel_id, name, message, logo_url, sort_order)
-     VALUES (?, ?, ?, ?, 0)`
-  ).run(
-    result.lastInsertRowid,
-    "Patrocinador Principal",
-    "Apoya a quienes impulsan la comunidad Voranix.",
-    ""
-  );
+    const channelDbId = insertedChannel.rows[0].id;
 
-  db.prepare(
-    `INSERT INTO commands (channel_id, trigger, type, title, message, duration_ms, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, 0)`
-  ).run(
-    result.lastInsertRowid,
-    "!promo",
-    "promo",
-    "Promo Voranix",
-    "Visita a nuestros patrocinadores oficiales y apoya la comunidad.",
-    7000
-  );
+    await client.query(
+      `INSERT INTO sponsors (channel_id, name, message, logo_url, sort_order)
+       VALUES ($1,$2,$3,$4,0)`,
+      [
+        channelDbId,
+        "Patrocinador Principal",
+        "Apoya a quienes impulsan la comunidad Voranix.",
+        ""
+      ]
+    );
 
-  return getChannel(safeChannelId);
+    await client.query(
+      `INSERT INTO commands (channel_id, trigger, type, title, message, duration_ms, sort_order)
+       VALUES ($1,$2,$3,$4,$5,$6,0)`,
+      [
+        channelDbId,
+        "!promo",
+        "promo",
+        "Promo Voranix",
+        "Visita a nuestros patrocinadores oficiales y apoya la comunidad.",
+        7000
+      ]
+    );
+
+    return getChannel(safeChannelId);
+  });
 }
 
-function getChannel(channelId) {
-  return mapChannelRow(getChannelRowByChannelId(channelId));
+async function getChannel(channelId) {
+  return mapChannelRow(await getChannelRowByChannelId(channelId));
 }
 
-function getOrCreateChannel(channelId, ownerUserId = null) {
-  const existing = getChannel(channelId);
+async function getOrCreateChannel(channelId, ownerUserId = null) {
+  const existing = await getChannel(channelId);
   if (existing) return existing;
   return insertDefaultChannel(channelId, ownerUserId);
 }
 
-function assignChannelOwner(channelId, ownerUserId) {
-  db.prepare("UPDATE channels SET owner_user_id = ?, updated_at = CURRENT_TIMESTAMP WHERE channel_id = ?").run(
-    ownerUserId,
-    normalizeChannelId(channelId)
+async function assignChannelOwner(channelId, ownerUserId) {
+  await query(
+    "UPDATE channels SET owner_user_id = $1, updated_at = NOW() WHERE channel_id = $2",
+    [ownerUserId, normalizeChannelId(channelId)]
   );
 }
 
-function ensureOwnedChannelForUser(user) {
+async function ensureOwnedChannelForUser(user) {
   const safeChannelId = normalizeChannelId(user.login);
-  const existing = getChannel(safeChannelId);
+  const existing = await getChannel(safeChannelId);
 
   if (!existing) {
     return insertDefaultChannel(safeChannelId, user.id);
   }
 
   if (!existing.ownerUserId) {
-    assignChannelOwner(safeChannelId, user.id);
+    await assignChannelOwner(safeChannelId, user.id);
   }
 
   return getChannel(safeChannelId);
 }
 
-function getAllChannels() {
-  return db
-    .prepare("SELECT * FROM channels ORDER BY channel_id ASC")
-    .all()
-    .map(mapChannelRow);
+async function getAllChannels() {
+  const result = await query("SELECT * FROM channels ORDER BY channel_id ASC");
+  return Promise.all(result.rows.map(mapChannelRow));
 }
 
-function getAccessibleChannels(user) {
+async function getAccessibleChannels(user) {
   if (!user) return [];
   if (user.role === "admin") {
     return getAllChannels();
   }
 
-  const owned = ensureOwnedChannelForUser(user);
+  const owned = await ensureOwnedChannelForUser(user);
   return owned ? [owned] : [];
 }
 
-function getPublicChannelConfig(channelId) {
-  const channel = getOrCreateChannel(channelId);
+async function getPublicChannelConfig(channelId) {
+  const channel = await getOrCreateChannel(channelId);
   return {
     channelId: channel.channelId,
     twitchChannel: channel.twitchChannel,
@@ -221,8 +233,8 @@ function getPublicChannelConfig(channelId) {
   };
 }
 
-function findChannelByTwitchChannel(twitchChannel) {
-  return mapChannelRow(getChannelRowByTwitchChannel(twitchChannel));
+async function findChannelByTwitchChannel(twitchChannel) {
+  return mapChannelRow(await getChannelRowByTwitchChannel(twitchChannel));
 }
 
 function canManageChannel(user, channelId) {
@@ -231,9 +243,9 @@ function canManageChannel(user, channelId) {
   return normalizeChannelId(user.login) === normalizeChannelId(channelId);
 }
 
-function saveChannel(channelId, payload, options = {}) {
+async function saveChannel(channelId, payload, options = {}) {
   const safeChannelId = normalizeChannelId(channelId);
-  const existing = getOrCreateChannel(safeChannelId, options.ownerUserId || null);
+  const existing = await getOrCreateChannel(safeChannelId, options.ownerUserId || null);
   const branding = sanitizeBranding(payload.branding || {}, existing.branding, safeChannelId);
   const commands =
     Array.isArray(payload.commands) && payload.commands.length
@@ -247,70 +259,68 @@ function saveChannel(channelId, payload, options = {}) {
     payload.twitchChannel || existing.twitchChannel || safeChannelId
   );
 
-  db.exec("BEGIN");
+  await withTransaction(async (client) => {
+    const channelRowResult = await client.query(
+      "SELECT * FROM channels WHERE channel_id = $1",
+      [safeChannelId]
+    );
+    const row = channelRowResult.rows[0];
 
-  try {
-    const row = getChannelRowByChannelId(safeChannelId);
-
-    db.prepare(
+    await client.query(
       `UPDATE channels
-       SET twitch_channel = ?,
-           owner_user_id = COALESCE(?, owner_user_id),
-           community_name = ?,
-           logo_text = ?,
-           accent = ?,
-           secondary_accent = ?,
-           logo_url = ?,
-           persistent_message = ?,
-           ticker_text = ?,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`
-    ).run(
-      nextTwitchChannel,
-      options.ownerUserId || null,
-      branding.communityName,
-      branding.logoText,
-      branding.accent,
-      branding.secondaryAccent,
-      branding.logoUrl,
-      branding.persistentMessage,
-      branding.tickerText,
-      row.id
+       SET twitch_channel = $1,
+           owner_user_id = COALESCE($2, owner_user_id),
+           community_name = $3,
+           logo_text = $4,
+           accent = $5,
+           secondary_accent = $6,
+           logo_url = $7,
+           persistent_message = $8,
+           ticker_text = $9,
+           updated_at = NOW()
+       WHERE id = $10`,
+      [
+        nextTwitchChannel,
+        options.ownerUserId || null,
+        branding.communityName,
+        branding.logoText,
+        branding.accent,
+        branding.secondaryAccent,
+        branding.logoUrl,
+        branding.persistentMessage,
+        branding.tickerText,
+        row.id
+      ]
     );
 
-    db.prepare("DELETE FROM commands WHERE channel_id = ?").run(row.id);
-    const insertCommand = db.prepare(
-      `INSERT INTO commands (channel_id, trigger, type, title, message, duration_ms, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    );
-    commands.forEach((command, index) => {
-      insertCommand.run(
-        row.id,
-        command.trigger,
-        command.type,
-        command.title,
-        command.message,
-        command.durationMs,
-        index
+    await client.query("DELETE FROM commands WHERE channel_id = $1", [row.id]);
+    for (const [index, command] of commands.entries()) {
+      await client.query(
+        `INSERT INTO commands (channel_id, trigger, type, title, message, duration_ms, sort_order)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [
+          row.id,
+          command.trigger,
+          command.type,
+          command.title,
+          command.message,
+          command.durationMs,
+          index
+        ]
       );
-    });
-
-    if (options.allowSponsorEdit) {
-      db.prepare("DELETE FROM sponsors WHERE channel_id = ?").run(row.id);
-      const insertSponsor = db.prepare(
-        `INSERT INTO sponsors (channel_id, name, message, logo_url, sort_order)
-         VALUES (?, ?, ?, ?, ?)`
-      );
-      sponsors.forEach((sponsor, index) => {
-        insertSponsor.run(row.id, sponsor.name, sponsor.message, sponsor.logoUrl, index);
-      });
     }
 
-    db.exec("COMMIT");
-  } catch (error) {
-    db.exec("ROLLBACK");
-    throw error;
-  }
+    if (options.allowSponsorEdit) {
+      await client.query("DELETE FROM sponsors WHERE channel_id = $1", [row.id]);
+      for (const [index, sponsor] of sponsors.entries()) {
+        await client.query(
+          `INSERT INTO sponsors (channel_id, name, message, logo_url, sort_order)
+           VALUES ($1,$2,$3,$4,$5)`,
+          [row.id, sponsor.name, sponsor.message, sponsor.logoUrl, index]
+        );
+      }
+    }
+  });
 
   return getChannel(safeChannelId);
 }
